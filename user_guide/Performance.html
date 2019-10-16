@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+<!-- Basic Page Needs
+  –––––––––––––––––––––––––––––––––––––––––––––––––– -->
+<meta charset="utf-8"/>
+<title>Performance — Datashader 0.8.0.post6+g730d573 documentation</title>
+<meta content="Turns even the largest data into images, accurately." name="description"/>
+<meta content="Datashader contributors" name="author"/>
+<!-- Mobile Specific Metas
+  –––––––––––––––––––––––––––––––––––––––––––––––––– -->
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<!-- FONT
+  –––––––––––––––––––––––––––––––––––––––––––––––––– -->
+<script src="https://ajax.googleapis.com/ajax/libs/webfont/1.6.16/webfont.js"></script>
+<script>
+    WebFont.load({
+      google: {
+        families: ['Source Sans Pro']
+      }
+    });
+  </script>
+<!-- CSS
+  –––––––––––––––––––––––––––––––––––––––––––––––––– -->
+<link href="../_static/css/main.css" rel="stylesheet"/>
+<link href="../_static/nbsite.css" rel="stylesheet"/>
+<!-- Scripts
+  –––––––––––––––––––––––––––––––––––––––––––––––––– -->
+<script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+<script async="" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.1/MathJax.js?config=TeX-MML-AM_CHTML" type="text/javascript">
+</script>
+<script src="../_static/js/main.js"></script>
+<script src="../_static/nbsite.js"></script>
+<script src="../_static/require.js"></script>
+<!-- Favicon
+  –––––––––––––––––––––––––––––––––––––––––––––––––– -->
+<link href="../_static/favicon.ico" rel="icon" type="image/png"/>
+<!-- Canonical
+  –––––––––––––––––––––––––––––––––––––––––––––––––– -->
+<link href="/user_guide/Performance.html" rel="canonical">
+</link></head>
+<body class="">
+<header class="navigation">
+<div class="wrapper">
+<a class="logo" href="../index.html">
+<img alt="Logo" src="../_static/datashader-logo.png"/>
+</a>
+<a class="navigation-menu logo-text" href="../index.html">Datashader</a>
+<a class="navigation-menu-button" href="javascript:void(0)" id="js-mobile-menu">Menu</a>
+<nav>
+<ul class="navigation-menu show" id="js-navigation-menu">
+<li class="nav-link doc-head"><a href="https://github.com/bokeh/datashader/">Github</a></li>
+<li class="nav-link doc-head"><a href="https://twitter.com/datashader/">Twitter</a></li>
+<li class="nav-link doc-head"><a href="https://gitter.im/pyviz/pyviz">Gitter</a></li>
+<li class="nav-link doc-head"><a href="http://pyviz.org">PyViz</a></li>
+<li class="nav-link">
+<div style="display:inline-block;vertical-align: middle;">
+<div class="search-bar">
+<form action="../search.html" method="get" role="search">
+<input name="q" placeholder="Search" type="search"/>
+<button type="submit">
+<img alt="Search Icon" src="https://raw.githubusercontent.com/thoughtbot/refills/master/source/images/search-icon-black.png"/>
+</button>
+</form>
+</div>
+</div>
+</li>
+</ul>
+</nav>
+</div>
+</header>
+<div class="second-nav">
+<nav>
+<ul class="navigation-menu show">
+<li class="nav-link doc-head"><a href="../getting_started/index.html">Getting Started</a></li>
+<li class="nav-link doc-head"><a href="index.html">User Guide</a></li>
+<li class="nav-link doc-head"><a href="../topics/index.html">Topics</a></li>
+<li class="nav-link doc-head"><a href="../api.html">API</a></li>
+<li class="nav-link doc-head"><a href="../FAQ.html">FAQ</a></li>
+<li class="nav-link doc-head"><a href="../about.html">About</a></li>
+</ul>
+</nav>
+</div>
+<!-- MAIN BODY OF DOCS –––––––––––––––––– -->
+<div class="docs section">
+<div id="hacketyhackhack"> <!-- style="width:20%;margin-right: 100px;"> --> <!--style="display: none;"> style="display:none;"> -->
+<div class="toc" style="width:15%; margin-right:20px;">
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../index.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../getting_started/index.html">Getting Started</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="index.html">User Guide</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="Plotting_Pitfalls.html">Plotting Pitfalls</a></li>
+<li class="toctree-l2"><a class="reference internal" href="Points.html">Points</a></li>
+<li class="toctree-l2"><a class="reference internal" href="Timeseries.html">Timeseries</a></li>
+<li class="toctree-l2"><a class="reference internal" href="Trajectories.html">Trajectories</a></li>
+<li class="toctree-l2"><a class="reference internal" href="Grids.html">Grids</a></li>
+<li class="toctree-l2"><a class="reference internal" href="Trimesh.html">Trimesh</a></li>
+<li class="toctree-l2"><a class="reference internal" href="Networks.html">Networks</a></li>
+<li class="toctree-l2"><a class="reference internal" href="Geography.html">Geography</a></li>
+<li class="toctree-l2"><a class="reference internal" href="Extending.html">Extending</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">Performance</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../topics/index.html">Topics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api.html">API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../FAQ.html">FAQ</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../about.html">About</a></li>
+</ul>
+</div>
+</div>
+<div class="content"> <!-- style="max-width:80%;margin-left:auto;margin-right: auto;">-->
+<div class="section" id="performance">
+<h1>Performance<a class="headerlink" href="#performance" title="Permalink to this headline">¶</a></h1>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div>
+<div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>Datashader is designed to make it simple to work with even very large
+datasets. To get good performance, it is essential that each step in the
+overall processing pipeline be set up appropriately. Below we share some
+of our suggestions based on our own <a href="https://github.com/pyviz/datashader/issues/313">Benchmarking</a> and optimization
+experience, which should help you obtain suitable performance in your
+own work.</p>
+<h2 id="File-formats">File formats<a class="anchor-link" href="#File-formats">¶</a></h2><p>Based on our <a href="https://github.com/pyviz/datashader/issues/129">testing with various file formats</a>, we recommend storing
+any large columnar datasets in the <a href="https://parquet.apache.org/">Apache Parquet</a> format when
+possible, using the <a href="https://github.com/dask/fastparquet">fastparquet</a> library with "Snappy" compression:</p>
+<pre><code>&gt;&gt;&gt; import dask.dataframe as dd
+&gt;&gt;&gt; dd.to_parquet(filename, df, compression="SNAPPY")</code></pre>
+<p>If your data includes categorical values that take on a limited, fixed
+number of possible values (e.g. "Male", "Female"),
+Parquet's categorical columns use a more memory-efficient data representation and
+are optimized for common operations such as sorting and finding uniques.
+Before saving, just convert the column as follows:</p>
+<pre><code>&gt;&gt;&gt; df[colname] = df[colname].astype('category')</code></pre>
+<p>By default, numerical datasets typically use 64-bit floats, but many
+applications do not require 64-bit precision when aggregating over a
+very large number of datapoints to show a distribution. Using 32-bit
+floats reduces storage and memory requirements in half, and also
+typically greatly speeds up computations because only half as much data
+needs to be accessed in memory. If applicable to your particular
+situation, just convert the data type before generating the file:</p>
+<pre><code>&gt;&gt;&gt; df[colname] = df[colname].astype(numpy.float32)</code></pre>
+<h2 id="Single-machine">Single machine<a class="anchor-link" href="#Single-machine">¶</a></h2><p>Datashader supports both Pandas and Dask dataframes, but Dask dataframes
+typically give higher performance even on a single machine, because it
+makes good use of all available cores, and it also supports out-of-core
+operation for datasets larger than memory.</p>
+<p>Dasks works on chunks of the data at any one time, called partitions.
+With dask on a single machine, a rule of thumb for the number of
+partitions to use is <code>multiprocessing.cpu_count()</code>, which allows Dask to
+use one thread per core for parallelizing computations.</p>
+<p>When the entire dataset fits into memory at once, you can persist the
+data as a Dask dataframe prior to passing it into datashader, to ensure
+that data only needs to be loaded once:</p>
+<pre><code>&gt;&gt;&gt; from dask import dataframe as dd
+&gt;&gt;&gt; import multiprocessing as mp
+&gt;&gt;&gt; dask_df = dd.from_pandas(df, npartitions=mp.cpu_count())
+&gt;&gt;&gt; dask_df.persist()
+...
+&gt;&gt;&gt; cvs = datashader.Canvas(...)
+&gt;&gt;&gt; agg = cvs.points(dask_df, ...)</code></pre>
+</div>
+</div>
+</div>
+<hr class="docutils"/>
+<p><a class="reference external" href="https://raw.githubusercontent.com/pyviz/datashader/master/examples/user_guide/10_Performance.ipynb">Right click to download this notebook from GitHub.</a></p>
+</div>
+</div>
+</div>
+<!-- END MAIN BODY OF DOCS ––––––––––––– -->
+<footer class="footer">
+<div class="footer-links">
+<ul>
+<li><span class="footer-title">Links</span></li>
+<li><a href="../getting_started/index.html">Getting Started</a></li>
+<li><a href="index.html">User Guide</a></li>
+<li><a href="../topics/index.html">Topics</a></li>
+<li><a href="../api.html">API</a></li>
+<li><a href="../FAQ.html">FAQ</a></li>
+<li><a href="../about.html">About</a></li>
+</ul>
+<ul>
+<li><span class="footer-title">Join Us</span></li>
+<li><a href="https://github.com/bokeh/datashader/">Github</a></li>
+<li><a href="https://twitter.com/datashader/">Twitter</a></li>
+<li><a href="https://gitter.im/pyviz/pyviz">Gitter</a></li>
+<li><a href="http://pyviz.org">PyViz</a></li>
+</ul>
+<ul class="copyright">
+<li>2016-2019, Anaconda, Inc.</li>
+</ul>
+</div>
+</footer>
+<!-- Google Analytics -->
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-61554933-1', 'auto');
+  ga('send', 'pageview');
+
+</script>
+<!-- MathJax Config -->
+<script type="text/x-mathjax-config">
+MathJax.Hub.Config({
+  tex2jax: {inlineMath: [['$','$'], ['\\(','\\)']]}
+});
+</script>
+<!-- End Document
+  –––––––––––––––––––––––––––––––––––––––––––––––––– -->
+</body>
+</html>
