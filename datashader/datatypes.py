@@ -74,25 +74,23 @@ Elements of start_indices must be less than the length of flat_array ({m})
             m=len(flat_array), vals=repr(some_invalid_vals)))
 
 
+def _ragged_or_nan(a):
+    if np.isscalar(a) and np.isnan(a):
+        return a
+    else:
+        return _RaggedElement(a)
+
+
+def _array_or_nan(a):
+    if np.isscalar(a) and np.isnan(a) or isinstance(a, np.ndarray):
+        return a
+    else:
+        return a.array
+
 # Internal ragged element array wrapper that provides
 # equality, ordering, and hashing.
 @total_ordering
 class _RaggedElement(object):
-
-    @staticmethod
-    def ragged_or_nan(a):
-        if np.isscalar(a) and np.isnan(a):
-            return a
-        else:
-            return _RaggedElement(a)
-
-    @staticmethod
-    def array_or_nan(a):
-        if np.isscalar(a) and np.isnan(a):
-            return a
-        else:
-            return a.array
-
     def __init__(self, array):
         self.array = array
 
@@ -114,6 +112,36 @@ class _RaggedElement(object):
         return array_repr.replace('array', 'ragged_element')
 
 
+@total_ordering
+class Geom(_RaggedElement):
+    def __repr__(self):
+        data = [(x, y) for x, y in zip(self.xs, self.ys)]
+        return "{typ}({data})".format(typ=self.__class__.__name__, data=data)
+
+    @property
+    def xs(self):
+        return self.array[0::2]
+
+    @property
+    def ys(self):
+        return self.array[1::2]
+
+
+@total_ordering
+class Polygons(Geom):
+    pass
+
+
+@total_ordering
+class Lines(Geom):
+    pass
+
+
+@total_ordering
+class Points(Geom):
+    pass
+
+
 @register_extension_dtype
 class RaggedDtype(ExtensionDtype):
     """
@@ -124,12 +152,13 @@ class RaggedDtype(ExtensionDtype):
     """
     type = np.ndarray
     base = np.dtype('O')
-    _subtype_re = re.compile(r"^ragged\[(?P<subtype>\w+)\]$")
     _metadata = ('_dtype',)
+    _type_name = 'Ragged'
+    _subtype_re = re.compile(r"^ragged\[(?P<subtype>\w+)\]$")
 
     @property
     def name(self):
-        return 'Ragged[{subtype}]'.format(subtype=self.subtype)
+        return '{name}[{subtype}]'.format(name=self._type_name, subtype=self.subtype)
 
     def __repr__(self):
         return self.name
@@ -143,12 +172,12 @@ class RaggedDtype(ExtensionDtype):
         # lowercase string
         string = string.lower()
 
-        msg = "Cannot construct a 'RaggedDtype' from '{}'"
-        if string.startswith('ragged'):
+        msg = "Cannot construct a '%s' from '{}'" % cls.__name__
+        if string.startswith(cls._type_name.lower()):
             # Extract subtype
             try:
                 subtype_string = cls._parse_subtype(string)
-                return RaggedDtype(dtype=subtype_string)
+                return cls(dtype=subtype_string)
             except Exception:
                 raise TypeError(msg.format(string))
         else:
@@ -189,12 +218,52 @@ class RaggedDtype(ExtensionDtype):
         match = cls._subtype_re.match(dtype_string)
         if match:
             subtype_string = match.groupdict()['subtype']
-        elif dtype_string == 'ragged':
+        elif dtype_string == cls._type_name.lower():
             subtype_string = 'float64'
         else:
             raise ValueError("Cannot parse {dtype_string}".format(
                 dtype_string=dtype_string))
         return subtype_string
+
+
+@register_extension_dtype
+class GeomDtype(RaggedDtype):
+    _type_name = "Geom"
+    _subtype_re = re.compile(r"^geom\[(?P<subtype>\w+)\]$")
+
+    @classmethod
+    def construct_array_type(cls):
+        return GeomArray
+
+
+@register_extension_dtype
+class PolygonsDtype(GeomDtype):
+    _type_name = "Polygons"
+    _subtype_re = re.compile(r"^polygons\[(?P<subtype>\w+)\]$")
+
+    @classmethod
+    def construct_array_type(cls):
+        return PolygonsArray
+
+
+@register_extension_dtype
+class LinesDtype(GeomDtype):
+    _type_name = "Lines"
+    _subtype_re = re.compile(r"^lines\[(?P<subtype>\w+)\]$")
+
+    @classmethod
+    def construct_array_type(cls):
+        return LinesArray
+
+
+@register_extension_dtype
+class PointsDtype(GeomDtype):
+    _type_name = "Points"
+    _subtype_re = re.compile(r"^points\[(?P<subtype>\w+)\]$")
+
+    @classmethod
+    def construct_array_type(cls):
+        return PointsArray
 
 
 def missing(v):
@@ -208,6 +277,8 @@ class RaggedArray(ExtensionArray):
     Methods not otherwise documented here are inherited from ExtensionArray;
     please see the corresponding method on that class for the docstring
     """
+    _element_type = None
+
     def __init__(self, data, dtype=None, copy=False):
         """
         Construct a RaggedArray
@@ -307,15 +378,20 @@ class RaggedArray(ExtensionArray):
                 # increment next start index
                 next_start_ind += n
 
-        self._dtype = RaggedDtype(dtype=dtype)
+        self._dtype = self._dtype_class(dtype=dtype)
+
+    @property
+    def _dtype_class(self):
+        return RaggedDtype
 
     def __eq__(self, other):
-        if isinstance(other, RaggedArray):
+        if isinstance(other, type(self)):
             if len(other) != len(self):
                 raise ValueError("""
-Cannot check equality of RaggedArray values of unequal length
+Cannot check equality of {typ} values of unequal length
     len(ra1) == {len_ra1}
     len(ra2) == {len_ra2}""".format(
+                    typ=self.__class__.__name__,
                     len_ra1=len(self),
                     len_ra2=len(other)))
 
@@ -350,8 +426,8 @@ Cannot check equality of RaggedArray values of unequal length
                     self.start_indices, self.flat_array, other_array)
             else:
                 raise ValueError("""
-Cannot check equality of RaggedArray of length {ra_len} with:
-    {other}""".format(ra_len=len(self), other=repr(other)))
+Cannot check equality of {typ} of length {ra_len} with:
+    {other}""".format(typ=type(self).__name__, ra_len=len(self), other=repr(other)))
 
         return result
 
@@ -399,27 +475,30 @@ Cannot check equality of RaggedArray of length {ra_len} with:
                              if item + 1 <= len(self) - 1
                              else len(self.flat_array))
 
-                return (self.flat_array[slice_start:slice_end]
-                        if slice_end!=slice_start
-                        else np.nan)
+                if slice_end == slice_start:
+                    return np.nan
+                elif self._element_type is None:
+                    return self.flat_array[slice_start:slice_end]
+                else:
+                    return self._element_type(self.flat_array[slice_start:slice_end])
 
         elif type(item) == slice:
             data = []
             selected_indices = np.arange(len(self))[item]
 
             for selected_index in selected_indices:
-                data.append(self[selected_index])
+                data.append(_array_or_nan(self[selected_index]))
 
-            return RaggedArray(data, dtype=self.flat_array.dtype)
+            return self.__class__(data, dtype=self.flat_array.dtype)
 
         elif isinstance(item, np.ndarray) and item.dtype == 'bool':
             data = []
 
             for i, m in enumerate(item):
                 if m:
-                    data.append(self[i])
+                    data.append(_array_or_nan(self[i]))
 
-            return RaggedArray(data, dtype=self.flat_array.dtype)
+            return self.__class__(data, dtype=self.flat_array.dtype)
         elif isinstance(item, (list, np.ndarray)):
             return self.take(item, allow_fill=False)
         else:
@@ -427,17 +506,16 @@ Cannot check equality of RaggedArray of length {ra_len} with:
 
     @classmethod
     def _from_sequence(cls, scalars, dtype=None, copy=False):
-        return RaggedArray(scalars, dtype=dtype)
+        return cls(scalars, dtype=dtype)
 
     @classmethod
     def _from_factorized(cls, values, original):
-        return RaggedArray(
-            [_RaggedElement.array_or_nan(v) for v in values],
+        return cls(
+            [_array_or_nan(v) for v in values],
             dtype=original.flat_array.dtype)
 
     def _as_ragged_element_array(self):
-        return np.array([_RaggedElement.ragged_or_nan(self[i])
-                         for i in range(len(self))])
+        return np.array([_ragged_or_nan(self[i]) for i in range(len(self))])
 
     def _values_for_factorize(self):
         return self._as_ragged_element_array(), np.nan
@@ -450,7 +528,7 @@ Cannot check equality of RaggedArray of length {ra_len} with:
 
         uniques = unique(self._as_ragged_element_array())
         return self._from_sequence(
-            [_RaggedElement.array_or_nan(v) for v in uniques],
+            [_array_or_nan(v) for v in uniques],
             dtype=self.dtype)
 
     def fillna(self, value=None, method=None, limit=None):
@@ -462,7 +540,7 @@ Cannot check equality of RaggedArray of length {ra_len} with:
 
         mask = self.isna()
 
-        if isinstance(value, RaggedArray):
+        if isinstance(value, type(self)):
             if len(value) != len(self):
                 raise ValueError("Length of 'value' does not match. Got ({}) "
                                  " expected {}".format(len(value), len(self)))
@@ -511,7 +589,7 @@ Cannot check equality of RaggedArray of length {ra_len} with:
 
     def searchsorted(self, value, side="left", sorter=None):
         arr = self._as_ragged_element_array()
-        if isinstance(value, RaggedArray):
+        if isinstance(value, type(self)):
             search_value = value._as_ragged_element_array()
         else:
             search_value = _RaggedElement(value)
@@ -537,16 +615,16 @@ Invalid indices for take with allow_fill True: {inds}""".format(
             if len(self) == 0 and len(indices) > 0:
                 raise IndexError("cannot do a non-empty take")
 
-            sequence = [self[i] for i in indices]
+            sequence = [_array_or_nan(self[i]) for i in indices]
 
-        return RaggedArray(sequence, dtype=self.flat_array.dtype)
+        return self.__class__(sequence, dtype=self.flat_array.dtype)
 
     def copy(self, deep=False):
         data = dict(
             flat_array=self.flat_array,
             start_indices=self.start_indices)
 
-        return RaggedArray(data, copy=deep)
+        return self.__class__(data, copy=deep)
 
     @classmethod
     def _concat_same_type(cls, to_concat):
@@ -561,7 +639,7 @@ Invalid indices for take with allow_fill True: {inds}""".format(
         start_indices = np.hstack([ra.start_indices + offset
                                    for offset, ra in zip(offsets, to_concat)])
 
-        return RaggedArray(dict(
+        return cls(dict(
             flat_array=flat_array, start_indices=start_indices),
             copy=False)
 
@@ -586,6 +664,57 @@ Invalid indices for take with allow_fill True: {inds}""".format(
                 np.asarray(self))
 
         return np.array([v for v in self], dtype=dtype, copy=copy)
+
+
+class GeomArray(RaggedArray):
+    _element_type = Geom
+
+    def __init__(self, *args, **kwargs):
+        super(GeomArray, self).__init__(*args, **kwargs)
+        # Validate that there are an even number of elements in each Geom element
+        if (any(self.start_indices % 2) or
+                (len(self.flat_array) - self.start_indices[-1]) % 2 > 0):
+            raise ValueError("There must be an even number of elements in each row")
+
+    @property
+    def _dtype_class(self):
+        return GeomDtype
+
+    @property
+    def xs(self):
+        start_indices = self.start_indices // 2
+        flat_array = self.flat_array[0::2]
+        return RaggedArray({"start_indices": start_indices, "flat_array": flat_array})
+
+    @property
+    def ys(self):
+        start_indices = self.start_indices // 2
+        flat_array = self.flat_array[1::2]
+        return RaggedArray({"start_indices": start_indices, "flat_array": flat_array})
+
+
+class PolygonsArray(GeomArray):
+    _element_type = Polygons
+
+    @property
+    def _dtype_class(self):
+        return PolygonsDtype
+
+
+class LinesArray(GeomArray):
+    _element_type = Lines
+
+    @property
+    def _dtype_class(self):
+        return LinesDtype
+
+
+class PointsArray(GeomArray):
+    _element_type = Points
+
+    @property
+    def _dtype_class(self):
+        return LinesDtype
 
 
 @jit(nopython=True, nogil=True)
