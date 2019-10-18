@@ -22,29 +22,25 @@ class Polygons(Geom):
             polygon_parts.append(interior)
         return polygon_parts
 
-    @staticmethod
-    def _polygons_to_array_parts(polygons):
+    @classmethod
+    def _shapely_to_array_parts(cls, shape):
         import shapely.geometry as sg
-        if isinstance(polygons, sg.Polygon):
+        if isinstance(shape, sg.Polygon):
             # Single polygon
-            return Polygons._polygon_to_array_parts(polygons)
-        elif isinstance(polygons, sg.MultiPolygon):
-            polygons = list(polygons)
-            polygon_parts = Polygons._polygon_to_array_parts(polygons[0])
+            return Polygons._polygon_to_array_parts(shape)
+        elif isinstance(shape, sg.MultiPolygon):
+            shape = list(shape)
+            polygon_parts = Polygons._polygon_to_array_parts(shape[0])
             polygon_separator = np.array([np.inf, np.inf])
-            for polygon in polygons[1:]:
+            for polygon in shape[1:]:
                 polygon_parts.append(polygon_separator)
                 polygon_parts.extend(Polygons._polygon_to_array_parts(polygon))
             return polygon_parts
         else:
             raise ValueError("""
-Received invalid value of type {typ}. Must an instance of
-shapely.geometry.Polygon or shapely.geometry.MultiPolygon""")
-
-    @staticmethod
-    def from_shapely(shape):
-        polygon_parts = Polygons._polygons_to_array_parts(shape)
-        return Polygons(np.concatenate(polygon_parts))
+Received invalid value of type {typ}. Must be an instance of
+shapely.geometry.Polygon or shapely.geometry.MultiPolygon"""
+                             .format(typ=type(shape).__name__))
 
     def to_shapely(self):
         import shapely.geometry as sg
@@ -105,22 +101,3 @@ class PolygonsArray(GeomArray):
     @property
     def _dtype_class(self):
         return PolygonsDtype
-
-    @classmethod
-    def from_geopandas(cls, ga):
-        polygon_parts = [
-            Polygons._polygons_to_array_parts(shape) for shape in ga
-        ]
-        polygon_lengths = [
-            sum([len(part) for part in parts])
-            for parts in polygon_parts
-        ]
-        flat_array = np.concatenate(
-            [part for parts in polygon_parts for part in parts]
-        )
-        start_indices = np.concatenate(
-            [[0], polygon_lengths[:-1]]
-        ).astype('uint').cumsum()
-        return PolygonsArray({
-            'start_indices': start_indices, 'flat_array': flat_array
-        })

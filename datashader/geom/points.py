@@ -1,15 +1,30 @@
 import re
 from functools import total_ordering
-
+import numpy as np
 from pandas.core.dtypes.dtypes import register_extension_dtype
 
 from datashader.geom.base import Geom, GeomDtype, GeomArray
-from datashader.geom.line import LinesDtype
 
 
 @total_ordering
 class Points(Geom):
-    pass
+    @classmethod
+    def _shapely_to_array_parts(cls, shape):
+        import shapely.geometry as sg
+        if isinstance(shape, (sg.Point, sg.MultiPoint)):
+            # Single line
+            return [np.asarray(shape.ctypes)]
+        else:
+            raise ValueError("""
+Received invalid value of type {typ}. Must be an instance of Point,
+or MultiPoint""".format(typ=type(shape).__name__))
+
+    def to_shapely(self):
+        import shapely.geometry as sg
+        if len(self.array) == 2:
+            return sg.Point(self.array)
+        else:
+            return sg.MultiPoint(self.array.reshape(len(self.array) // 2, 2))
 
 
 @register_extension_dtype
@@ -27,4 +42,4 @@ class PointsArray(GeomArray):
 
     @property
     def _dtype_class(self):
-        return LinesDtype
+        return PointsDtype

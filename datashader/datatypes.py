@@ -84,8 +84,11 @@ def _ragged_or_nan(a):
 def _array_or_nan(a):
     if np.isscalar(a) and np.isnan(a) or isinstance(a, np.ndarray):
         return a
-    else:
+    elif isinstance(a, _RaggedElement):
         return a.array
+    else:
+        return a
+
 
 # Internal ragged element array wrapper that provides
 # equality, ordering, and hashing.

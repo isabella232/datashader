@@ -1,6 +1,6 @@
 import re
 from functools import total_ordering
-
+import numpy as np
 from pandas.core.dtypes.dtypes import register_extension_dtype
 
 from datashader.datatypes import _RaggedElement, RaggedDtype, RaggedArray
@@ -11,6 +11,15 @@ class Geom(_RaggedElement):
     def __repr__(self):
         data = [(x, y) for x, y in zip(self.xs, self.ys)]
         return "{typ}({data})".format(typ=self.__class__.__name__, data=data)
+
+    @classmethod
+    def _shapely_to_array_parts(cls, shape):
+        raise NotImplementedError()
+
+    @classmethod
+    def from_shapely(cls, shape):
+        shape_parts = cls._shapely_to_array_parts(shape)
+        return cls(np.concatenate(shape_parts))
 
     @property
     def xs(self):
@@ -63,4 +72,19 @@ class GeomArray(RaggedArray):
 
     @classmethod
     def from_geopandas(cls, ga):
-        raise NotImplementedError()
+        line_parts = [
+            cls._element_type._shapely_to_array_parts(shape) for shape in ga
+        ]
+        line_lengths = [
+            sum([len(part) for part in parts])
+            for parts in line_parts
+        ]
+        flat_array = np.concatenate(
+            [part for parts in line_parts for part in parts]
+        )
+        start_indices = np.concatenate(
+            [[0], line_lengths[:-1]]
+        ).astype('uint').cumsum()
+        return cls({
+            'start_indices': start_indices, 'flat_array': flat_array
+        })
