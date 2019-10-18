@@ -1,9 +1,13 @@
+from __future__ import absolute_import, division
 import re
+from math import sqrt, isfinite
 from functools import total_ordering
 import numpy as np
+
 from pandas.core.dtypes.dtypes import register_extension_dtype
 
 from datashader.geom.base import Geom, GeomDtype, GeomArray
+from datashader.utils import ngjit
 
 
 @total_ordering
@@ -43,6 +47,14 @@ MultiLineString, or LinearRing""".format(typ=type(shape).__name__))
         else:
             return sg.MultiLineString(lines)
 
+    @property
+    def length(self):
+        return compute_length(self.array, 0, len(self.array))
+
+    @property
+    def area(self):
+        return 0.0
+
 
 @register_extension_dtype
 class LinesDtype(GeomDtype):
@@ -60,3 +72,40 @@ class LinesArray(GeomArray):
     @property
     def _dtype_class(self):
         return LinesDtype
+
+    @property
+    def length(self):
+        result = np.zeros(self.start_indices.shape, dtype=self.flat_array.dtype)
+        compute_lengths(self.start_indices, self.flat_array, result)
+        return result
+
+    @property
+    def area(self):
+        return np.zeros(self.start_indices.shape, dtype=self.flat_array.dtype)
+
+
+@ngjit
+def compute_lengths(start_indices, flat_array, result):
+    n = len(start_indices)
+    for i in range(n):
+        start = start_indices[i]
+        stop = start_indices[i + 1] if i < n - 1 else len(flat_array)
+        result[i] = compute_length(flat_array, int(start), int(stop))
+
+
+@ngjit
+def compute_length(values, start, stop):
+    total_len = 0.0
+    x0 = values[start]
+    y0 = values[start + 1]
+    for i in range(start + 2, stop, 2):
+        x1 = values[i]
+        y1 = values[i+1]
+
+        if isfinite(x0) and isfinite(y0) and isfinite(x1) and isfinite(y1):
+            total_len += sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2)
+
+        x0 = x1
+        y0 = y1
+
+    return total_len

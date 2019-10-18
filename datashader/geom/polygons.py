@@ -1,10 +1,15 @@
+from __future__ import absolute_import
 import re
+from math import isfinite
 from functools import total_ordering
 
 import numpy as np
 from pandas.core.dtypes.dtypes import register_extension_dtype
 
 from datashader.geom.base import Geom, GeomDtype, GeomArray
+from datashader.geom.lines import compute_length, compute_lengths
+from datashader.utils import ngjit
+
 
 
 @total_ordering
@@ -84,6 +89,13 @@ shapely.geometry.Polygon or shapely.geometry.MultiPolygon"""
         else:
             return sg.MultiPolygon(polygons)
 
+    @property
+    def length(self):
+        return compute_length(self.array, 0, len(self.array))
+
+    @property
+    def area(self):
+        return compute_area(self.array, 0, len(self.array))
 
 @register_extension_dtype
 class PolygonsDtype(GeomDtype):
@@ -101,3 +113,59 @@ class PolygonsArray(GeomArray):
     @property
     def _dtype_class(self):
         return PolygonsDtype
+
+    @property
+    def length(self):
+        result = np.zeros(self.start_indices.shape, dtype=self.flat_array.dtype)
+        compute_lengths(self.start_indices, self.flat_array, result)
+        return result
+
+    @property
+    def area(self):
+        result = np.zeros(self.start_indices.shape, dtype=self.flat_array.dtype)
+        compute_areas(self.start_indices, self.flat_array, result)
+        return result
+
+
+@ngjit
+def compute_areas(start_indices, flat_array, result):
+    n = len(start_indices)
+    for i in range(n):
+        start = start_indices[i]
+        stop = start_indices[i + 1] if i < n - 1 else len(flat_array)
+        result[i] = compute_area(flat_array, int(start), int(stop))
+
+
+@ngjit
+def compute_area(values, start, stop):
+    area = 0.0
+    if stop - start < 6:
+        # A degenerate polygon
+        return 0.0
+    polygon_start = 0
+    for k in range(start, stop - 4, 2):
+        i, j = k + 2, k + 4
+        ix = values[i]
+        jy = values[j + 1]
+        ky = values[k + 1]
+        if not isfinite(values[j]):
+            # last vertex not finite, polygon traversal finished, add wraparound term
+            polygon_stop = j
+            firstx = values[polygon_start]
+            secondy = values[polygon_start + 3]
+            lasty = values[polygon_stop - 3]
+            area += firstx * (secondy - lasty)
+        elif not isfinite(values[i]):
+            # middle vertex not finite, but last vertex is.
+            # We're going to start a new polygon
+            polygon_start = j
+        elif isfinite(ix) and isfinite(jy) and isfinite(ky):
+            area += ix * (jy - ky)
+
+    # wrap-around term for final polygon
+    firstx = values[polygon_start]
+    secondy = values[polygon_start + 3]
+    lasty = values[stop - 3]
+    area += firstx * (secondy - lasty)
+
+    return area / 2.0

@@ -29,6 +29,14 @@ class Geom(_RaggedElement):
     def ys(self):
         return self.array[1::2]
 
+    @property
+    def length(self):
+        raise NotImplementedError()
+
+    @property
+    def area(self):
+        raise NotImplementedError()
+
 
 @register_extension_dtype
 class GeomDtype(RaggedDtype):
@@ -88,3 +96,11 @@ class GeomArray(RaggedArray):
         return cls({
             'start_indices': start_indices, 'flat_array': flat_array
         })
+
+    @property
+    def length(self):
+        raise NotImplementedError()
+
+    @property
+    def area(self):
+        raise NotImplementedError()

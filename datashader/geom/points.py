@@ -26,6 +26,14 @@ or MultiPoint""".format(typ=type(shape).__name__))
         else:
             return sg.MultiPoint(self.array.reshape(len(self.array) // 2, 2))
 
+    @property
+    def length(self):
+        return 0.0
+
+    @property
+    def area(self):
+        return 0.0
+
 
 @register_extension_dtype
 class PointsDtype(GeomDtype):
@@ -43,3 +51,11 @@ class PointsArray(GeomArray):
     @property
     def _dtype_class(self):
         return PointsDtype
+
+    @property
+    def length(self):
+        return np.zeros(self.start_indices.shape, dtype=self.flat_array.dtype)
+
+    @property
+    def area(self):
+        return np.zeros(self.start_indices.shape, dtype=self.flat_array.dtype)
