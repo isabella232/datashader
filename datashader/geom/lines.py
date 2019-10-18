@@ -6,7 +6,7 @@ import numpy as np
 
 from pandas.core.dtypes.dtypes import register_extension_dtype
 
-from datashader.geom.base import Geom, GeomDtype, GeomArray
+from datashader.geom.base import Geom, GeomDtype, GeomArray, _geom_map
 from datashader.utils import ngjit
 
 
@@ -76,21 +76,12 @@ class LinesArray(GeomArray):
     @property
     def length(self):
         result = np.zeros(self.start_indices.shape, dtype=self.flat_array.dtype)
-        compute_lengths(self.start_indices, self.flat_array, result)
+        _geom_map(self.start_indices, self.flat_array, result, compute_length)
         return result
 
     @property
     def area(self):
         return np.zeros(self.start_indices.shape, dtype=self.flat_array.dtype)
-
-
-@ngjit
-def compute_lengths(start_indices, flat_array, result):
-    n = len(start_indices)
-    for i in range(n):
-        start = start_indices[i]
-        stop = start_indices[i + 1] if i < n - 1 else len(flat_array)
-        result[i] = compute_length(flat_array, int(start), int(stop))
 
 
 @ngjit

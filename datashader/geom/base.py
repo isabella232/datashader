@@ -1,9 +1,12 @@
+from __future__ import absolute_import
+from math import isfinite, inf
 import re
 from functools import total_ordering
 import numpy as np
 from pandas.core.dtypes.dtypes import register_extension_dtype
 
 from datashader.datatypes import _RaggedElement, RaggedDtype, RaggedArray
+from datashader.utils import ngjit
 
 
 @total_ordering
@@ -28,6 +31,10 @@ class Geom(_RaggedElement):
     @property
     def ys(self):
         return self.array[1::2]
+
+    @property
+    def bounds(self):
+        return bounds_interleaved(self.array)
 
     @property
     def length(self):
@@ -98,9 +105,46 @@ class GeomArray(RaggedArray):
         })
 
     @property
+    def bounds(self):
+        return bounds_interleaved(self.flat_array)
+
+    @property
     def length(self):
         raise NotImplementedError()
 
     @property
     def area(self):
         raise NotImplementedError()
+
+
+@ngjit
+def _geom_map(start_indices, flat_array, result, fn):
+    n = len(start_indices)
+    for i in range(n):
+        start = start_indices[i]
+        stop = start_indices[i + 1] if i < n - 1 else len(flat_array)
+        result[i] = fn(flat_array, int(start), int(stop))
+
+
+@ngjit
+def bounds_interleaved(values):
+    """
+    compute bounds
+    """
+    xmin = inf
+    ymin = inf
+    xmax = -inf
+    ymax = -inf
+
+    for i in range(0, len(values), 2):
+        x = values[i]
+        if isfinite(x):
+            xmin = min(xmin, x)
+            xmax = max(xmax, x)
+
+        y = values[i + 1]
+        if isfinite(y):
+            ymin = min(ymin, y)
+            ymax = max(ymax, y)
+
+    return (xmin, ymin, xmax, ymax)

@@ -6,10 +6,9 @@ from functools import total_ordering
 import numpy as np
 from pandas.core.dtypes.dtypes import register_extension_dtype
 
-from datashader.geom.base import Geom, GeomDtype, GeomArray
-from datashader.geom.lines import compute_length, compute_lengths
+from datashader.geom.base import Geom, GeomDtype, GeomArray, _geom_map
+from datashader.geom.lines import compute_length
 from datashader.utils import ngjit
-
 
 
 @total_ordering
@@ -97,6 +96,7 @@ shapely.geometry.Polygon or shapely.geometry.MultiPolygon"""
     def area(self):
         return compute_area(self.array, 0, len(self.array))
 
+
 @register_extension_dtype
 class PolygonsDtype(GeomDtype):
     _type_name = "Polygons"
@@ -117,23 +117,14 @@ class PolygonsArray(GeomArray):
     @property
     def length(self):
         result = np.zeros(self.start_indices.shape, dtype=self.flat_array.dtype)
-        compute_lengths(self.start_indices, self.flat_array, result)
+        _geom_map(self.start_indices, self.flat_array, result, compute_length)
         return result
 
     @property
     def area(self):
         result = np.zeros(self.start_indices.shape, dtype=self.flat_array.dtype)
-        compute_areas(self.start_indices, self.flat_array, result)
+        _geom_map(self.start_indices, self.flat_array, result, compute_area)
         return result
-
-
-@ngjit
-def compute_areas(start_indices, flat_array, result):
-    n = len(start_indices)
-    for i in range(n):
-        start = start_indices[i]
-        stop = start_indices[i + 1] if i < n - 1 else len(flat_array)
-        result[i] = compute_area(flat_array, int(start), int(stop))
 
 
 @ngjit
