@@ -24,6 +24,7 @@ from .area import (  # noqa (API import)
     AreaToLineAxis1Ragged,
 )
 from .trimesh import Triangles  # noqa (API import)
+from .polygon import PolygonGeom
 from .quadmesh import (  # noqa (API import)
     QuadMeshRectilinear, QuadMeshCurvialinear
 )

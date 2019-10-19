@@ -600,6 +600,14 @@ The axis argument to Canvas.line must be 0 or 1
 
         return bypixel(source, self, glyph, agg)
 
+    def polygons(self, source, geometry, agg=None):
+        from .glyphs import PolygonGeom
+        from .reductions import any as any_rdn
+        if agg is None:
+            agg = any_rdn()
+        glyph = PolygonGeom(geometry)
+        return bypixel(source, self, glyph, agg)
+
     def quadmesh(self, source, x=None, y=None, agg=None):
         """Samples a recti- or curvi-linear quadmesh by canvas size and bounds.
         Parameters
