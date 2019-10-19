@@ -37,6 +37,14 @@ class Geom(_RaggedElement):
         return bounds_interleaved(self.array)
 
     @property
+    def bounds_x(self):
+        return bounds_interleaved_1d(self.array, 0)
+
+    @property
+    def bounds_y(self):
+        return bounds_interleaved_1d(self.array, 1)
+
+    @property
     def length(self):
         raise NotImplementedError()
 
@@ -109,6 +117,14 @@ class GeomArray(RaggedArray):
         return bounds_interleaved(self.flat_array)
 
     @property
+    def bounds_x(self):
+        return bounds_interleaved_1d(self.flat_array, 0)
+
+    @property
+    def bounds_y(self):
+        return bounds_interleaved_1d(self.flat_array, 1)
+
+    @property
     def length(self):
         raise NotImplementedError()
 
@@ -148,3 +164,20 @@ def bounds_interleaved(values):
             ymax = max(ymax, y)
 
     return (xmin, ymin, xmax, ymax)
+
+
+@ngjit
+def bounds_interleaved_1d(values, offset):
+    """
+    compute bounds
+    """
+    vmin = inf
+    vmax = -inf
+
+    for i in range(0, len(values), 2):
+        v = values[i + offset]
+        if isfinite(v):
+            vmin = min(vmin, v)
+            vmax = max(vmax, v)
+
+    return (vmin, vmax)

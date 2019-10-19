@@ -6,6 +6,41 @@ from datashader.glyphs.glyph import Glyph
 from datashader.utils import isreal, ngjit
 
 
+class _GeomLike(Glyph):
+    def __init__(self, geometry):
+        self.geometry = geometry
+
+    @property
+    def ndims(self):
+        return 1
+
+    @property
+    def inputs(self):
+        return (self.geometry,)
+
+    @property
+    def geom_dtype(self):
+        from datashader.geom.base import GeomDtype
+        return GeomDtype
+
+    def validate(self, in_dshape):
+        if not isinstance(in_dshape[str(self.geometry)], self.geom_dtype):
+            raise ValueError('{col} must be a {typ} array'.format(
+                col=self.geometry, typ=self.geom_dtype._type_name
+            ))
+
+    def required_columns(self):
+        return [self.geometry]
+
+    def compute_x_bounds(self, df):
+        bounds = df[self.geometry].array.bounds_x
+        return self.maybe_expand_bounds(bounds)
+
+    def compute_y_bounds(self, df):
+        bounds = df[self.geometry].array.bounds_y
+        return self.maybe_expand_bounds(bounds)
+
+
 class _PointLike(Glyph):
     """Shared methods between Point and Line"""
     def __init__(self, x, y):
