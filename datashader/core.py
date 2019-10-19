@@ -124,6 +124,18 @@ class LogAxis(Axis):
 _axis_lookup = {'linear': LinearAxis(), 'log': LogAxis()}
 
 
+def validate_xy_or_geometry(glyph, x, y, geometry):
+    if (geometry is None and (x is None or y is None) or
+            geometry is not None and (x is not None or y is not None)):
+        raise ValueError("""
+{glyph} coordinates may be specified by providing both the x and y arguments, or by
+providing the geometry argument. Received:
+    x: {x}
+    y: {y}
+    geometry: {geometry}
+""".format(glyph=glyph, x=repr(x), y=repr(y), geometry=repr(geometry)))
+
+
 class Canvas(object):
     """An abstract canvas representing the space in which to bin.
 
@@ -148,7 +160,7 @@ class Canvas(object):
         self.x_axis = _axis_lookup[x_axis_type]
         self.y_axis = _axis_lookup[y_axis_type]
 
-    def points(self, source, x, y, agg=None):
+    def points(self, source, x=None, y=None, agg=None, geometry=None):
         """Compute a reduction by pixel, mapping data to pixels as points.
 
         Parameters
@@ -156,26 +168,38 @@ class Canvas(object):
         source : pandas.DataFrame, dask.DataFrame, or xarray.DataArray/Dataset
             The input datasource.
         x, y : str
-            Column names for the x and y coordinates of each point.
+            Column names for the x and y coordinates of each point. If provided,
+            the geometry argument may not also be provided.
         agg : Reduction, optional
             Reduction to compute. Default is ``count()``.
+        geometry: str
+            Column name of a PointsArray of the coordinates of each point. If provided,
+            the x and y arguments may not also be provided.
         """
-        from .glyphs import Point
+        from .glyphs import Point, PointGeom
         from .reductions import count as count_rdn
+
+        validate_xy_or_geometry('Point', x, y, geometry)
+
         if agg is None:
             agg = count_rdn()
 
-        if (isinstance(source, SpatialPointsFrame) and
-                source.spatial is not None and
-                source.spatial.x == x and source.spatial.y == y and
-                self.x_range is not None and self.y_range is not None):
+        # Handle down-selecting of SpatialPointsFrame
+        if geometry is None:
+            if (isinstance(source, SpatialPointsFrame) and
+                    source.spatial is not None and
+                    source.spatial.x == x and source.spatial.y == y and
+                    self.x_range is not None and self.y_range is not None):
 
-            source = source.spatial_query(
-                x_range=self.x_range, y_range=self.y_range)
+                source = source.spatial_query(
+                    x_range=self.x_range, y_range=self.y_range)
+            glyph = Point(x, y)
+        else:
+            glyph = PointGeom(geometry)
 
-        return bypixel(source, self, Point(x, y), agg)
+        return bypixel(source, self, glyph, agg)
 
-    def line(self, source, x, y, agg=None, axis=0):
+    def line(self, source, x=None, y=None, agg=None, axis=0, geometry=None):
         """Compute a reduction by pixel, mapping data to pixels as one or
         more lines.
 
@@ -275,55 +299,65 @@ class Canvas(object):
         """
         from .glyphs import (LineAxis0, LinesAxis1, LinesAxis1XConstant,
                              LinesAxis1YConstant, LineAxis0Multi,
-                             LinesAxis1Ragged)
+                             LinesAxis1Ragged, LineAxis1Geom)
         from .reductions import any as any_rdn
+
+        validate_xy_or_geometry('Line', x, y, geometry)
+
         if agg is None:
             agg = any_rdn()
 
-        # Broadcast column specifications to handle cases where
-        # x is a list and y is a string or vice versa
-        orig_x, orig_y = x, y
-        x, y = _broadcast_column_specifications(x, y)
+        if geometry is not None:
+            if axis != 1:
+                raise ValueError(
+                    'The geometry argument is only supported with axis=1'
+                )
+            glyph = LineAxis1Geom(geometry)
+        else:
+            # Broadcast column specifications to handle cases where
+            # x is a list and y is a string or vice versa
+            orig_x, orig_y = x, y
+            x, y = _broadcast_column_specifications(x, y)
 
-        if axis == 0:
-            if (isinstance(x, (Number, string_types)) and
-                    isinstance(y, (Number, string_types))):
-                glyph = LineAxis0(x, y)
-            elif (isinstance(x, (list, tuple)) and
-                    isinstance(y, (list, tuple))):
-                glyph = LineAxis0Multi(tuple(x), tuple(y))
-            else:
-                raise ValueError("""
+            if axis == 0:
+                if (isinstance(x, (Number, string_types)) and
+                        isinstance(y, (Number, string_types))):
+                    glyph = LineAxis0(x, y)
+                elif (isinstance(x, (list, tuple)) and
+                        isinstance(y, (list, tuple))):
+                    glyph = LineAxis0Multi(tuple(x), tuple(y))
+                else:
+                    raise ValueError("""
 Invalid combination of x and y arguments to Canvas.line when axis=0.
     Received:
         x: {x}
         y: {y}
 See docstring for more information on valid usage""".format(
-                    x=repr(orig_x), y=repr(orig_y)))
+                        x=repr(orig_x), y=repr(orig_y)))
 
-        elif axis == 1:
-            if isinstance(x, (list, tuple)) and isinstance(y, (list, tuple)):
-                glyph = LinesAxis1(tuple(x), tuple(y))
-            elif (isinstance(x, np.ndarray) and
-                  isinstance(y,  (list, tuple))):
-                glyph = LinesAxis1XConstant(x, tuple(y))
-            elif (isinstance(x, (list, tuple)) and
-                  isinstance(y, np.ndarray)):
-                glyph = LinesAxis1YConstant(tuple(x), y)
-            elif (isinstance(x, (Number, string_types)) and
-                    isinstance(y, (Number, string_types))):
-                glyph = LinesAxis1Ragged(x, y)
-            else:
-                raise ValueError("""
+            elif axis == 1:
+                if isinstance(x, (list, tuple)) and isinstance(y, (list, tuple)):
+                    glyph = LinesAxis1(tuple(x), tuple(y))
+                elif (isinstance(x, np.ndarray) and
+                      isinstance(y,  (list, tuple))):
+                    glyph = LinesAxis1XConstant(x, tuple(y))
+                elif (isinstance(x, (list, tuple)) and
+                      isinstance(y, np.ndarray)):
+                    glyph = LinesAxis1YConstant(tuple(x), y)
+                elif (isinstance(x, (Number, string_types)) and
+                        isinstance(y, (Number, string_types))):
+                    glyph = LinesAxis1Ragged(x, y)
+                else:
+                    raise ValueError("""
 Invalid combination of x and y arguments to Canvas.line when axis=1.
     Received:
         x: {x}
         y: {y}
 See docstring for more information on valid usage""".format(
-                    x=repr(orig_x), y=repr(orig_y)))
+                        x=repr(orig_x), y=repr(orig_y)))
 
-        else:
-            raise ValueError("""
+            else:
+                raise ValueError("""
 The axis argument to Canvas.line must be 0 or 1
     Received: {axis}""".format(axis=axis))
 
