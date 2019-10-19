@@ -422,11 +422,6 @@ class LinesAxis1Ragged(_PointLike):
 
 
 class LineAxis1Geom(_GeomLike):
-    @property
-    def geom_dtype(self):
-        from datashader.geom import LinesDtype
-        return LinesDtype
-
     @memoize
     def _build_extend(self, x_mapper, y_mapper, info, append):
         expand_aggs_and_cols = self.expand_aggs_and_cols(append)
