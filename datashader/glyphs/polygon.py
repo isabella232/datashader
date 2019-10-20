@@ -38,18 +38,15 @@ class PolygonGeom(_GeomLike):
 
 
 def _build_draw_polygon(append, map_onto_pixel, expand_aggs_and_cols):
-    """Specialize a line plotting kernel for a given append/axis combination"""
     @ngjit
     @expand_aggs_and_cols
     def draw_polygon(
-            i, sx, tx, sy, ty, xmin, xmax, ymin, ymax, segment_start,
+            i, sx, tx, sy, ty, xmin, xmax, ymin, ymax,
             start_index, stop_index, flat, *aggs_and_cols
     ):
-        """Draw a line segment using Bresenham's algorithm
-        This method plots a line segment with integer coordinates onto a pixel
-        grid.
+        """Draw a polygon using a winding-number scan-line algorithm
         """
-        # First pass, compute bounding box and count number of edges
+        # First pass, compute bounding box in data coordinates and count number of edges
         num_edges = 0
         poly_xmin = inf
         poly_ymin = inf
@@ -89,54 +86,56 @@ def _build_draw_polygon(append, map_onto_pixel, expand_aggs_and_cols):
                     append(i, xi, yi, *aggs_and_cols)
             return
 
-        # Build arrays of edge coordinates
+        # Build arrays of edge pixel coordinates
         xs = np.zeros((num_edges, 2), dtype=np.int32)
         ys = np.zeros((num_edges, 2), dtype=np.int32)
-        edge_num = 0
         yincreasing = np.zeros(num_edges, dtype=np.int8)
-        xincreasing = np.zeros(num_edges, dtype=np.int8)
+        xdecreasing = np.zeros(num_edges, dtype=np.int8)
+        ei = 0
         for j in range(start_index, stop_index - 2, 2):
             x0 = flat[j]
             y0 = flat[j + 1]
-            x1 = flat[j]
-            y1 = flat[j + 1]
+            x1 = flat[j + 2]
+            y1 = flat[j + 3]
             if isfinite(x0) and isfinite(y0) and isfinite(y0) and isfinite(y1):
                 x0i, y0i = map_onto_pixel(
                     sx, tx, sy, ty, xmin, xmax, ymin, ymax, x0, y0
                 )
-                xs[edge_num, 0] = x0i
-                ys[edge_num, 0] = y0i
+                xs[ei, 0] = x0i
+                ys[ei, 0] = y0i
 
                 x1i, y1i = map_onto_pixel(
                     sx, tx, sy, ty, xmin, xmax, ymin, ymax, x1, y1
                 )
-                xs[edge_num, 1] = x1i
-                ys[edge_num, 1] = y1i
+                xs[ei, 1] = x1i
+                ys[ei, 1] = y1i
 
                 if y1 > y0:
-                    yincreasing[edge_num] = 1
+                    yincreasing[ei] = 1
                 elif y1 < y0:
-                    yincreasing[edge_num] = -1
+                    yincreasing[ei] = -1
 
                 if x1 > x0:
-                    xincreasing[edge_num] = 1
+                    xdecreasing[ei] = -1
                 elif x1 < x0:
-                    xincreasing[edge_num] = -1
+                    xdecreasing[ei] = 1
 
-                edge_num += 1
+                ei += 1
 
         # Initialize array indicating which edges are still eligible for processing
         eligible = np.ones(num_edges, dtype=np.int8)
 
-
-        # Init winding number
-        winding_number = 0
-
+        # Perform scan-line algorithm
         for yi in range(startyi, stopyi):
+            # All edges eligible at start of new row
             eligible.fill(1)
             for xi in range(startxi, stopxi):
+                # Init winding number
+                winding_number = 0
                 for ei in range(num_edges):
                     if eligible[ei] == 0:
+                        # We've already determined that edge is above, below, or left
+                        # of edge for the current pixel
                         continue
 
                     # Get edge coordinates
@@ -149,44 +148,50 @@ def _build_draw_polygon(append, map_onto_pixel, expand_aggs_and_cols):
                     if ((y0i > yi and y1i > yi) or
                             (y0i < yi and y1i < yi) or
                             (x0i < xi and x1i < xi)):
-                        # edge not eligible for any remaining pixel in this row
+                        # Edge not eligible for any remaining pixel in this row
                         eligible[ei] = 0
                         continue
 
-                    # Test if edge is to the right of pixel
-                    #
-                    # Fast case
-                    if (x0i > xi and x1i > xi):
-                        # All we need is y increasing/decreasing
+                    # Not correct, need next increasing?
+                    if yincreasing[ei] != xdecreasing[ei] and y1i == yi:
+                        eligible[ei] = 0
+                        continue
+
+                    if x0i > xi and x1i > xi:
+                        # Edge is fully to the right of the pixel, so we know ray to the
+                        # the right of pixel intersects edge.
                         winding_number += yincreasing[ei]
+                    elif y0i == y1i or x0i == x1i:
+                        # Horizontal or vertical in pixel space. Given prior checks
+                        # we know that edge intersects with pixel
+                        winding_number += (yincreasing[ei]
+                                           if yincreasing[ei] != 0
+                                           else xdecreasing[ei])
                     else:
-                        # Use cross product of increasing/decreasing
-                        pass
+                        # Now check if edge is to the right of pixel using cross product
+                        # A is vector from pixel to first vertex
+                        ax = x0i - xi
+                        ay = y0i - yi
 
-                    # Below
+                        # B is vector from pixel to second vertex
+                        bx = x1i - xi
+                        by = y1i - yi
 
-                    # Left
+                        # Compute cross product of B and A
+                        bxa = (bx * ay - by * ax)
 
-        # map to pixel edge arrays, one element per edge
-        #   start_xis, stop_xis, start_yis, stop_yis
+                        if bxa * yincreasing[ei] < 0:
+                            # Edge to the right
+                            winding_number += yincreasing[ei]
+                        else:
+                            # Edge to left, not eligible for any remaining pixel in row
+                            eligible[ei] = 0
+                            continue
 
-        # Init arrays that will be used in fill algorithm
-        #   eligible, init with true for every edge
-
-        # Scan pixel rows in bbox:
-        #   eligible all true
-        #   Scan pixels in row:
-        #       winding_number = 0
-        #       Scan edges:
-        #           if not eligible, continue
-        #           if edge above, below, or left, eligible=False, continue
-        #               (careful rules for "left" when pixel is exactly on line,
-        #                to avoid overlap)
-        #           updating winding number
-        #
-        #       if winding_number != 0:
-        #           append pixel
-        pass
+                if winding_number != 0:
+                    # If winding number is not zero, point
+                    # is inside polygon
+                    append(i, xi, yi, *aggs_and_cols)
 
     return draw_polygon
 
