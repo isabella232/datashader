@@ -222,6 +222,6 @@ def _build_extend_polygon_geom(
             start_index = start_i[i]
             stop_index = (start_i[i + 1] if i < nrows - 1 else flat_len)
             draw_polygon(i, sx, tx, sy, ty, xmin, xmax, ymin, ymax,
-                         start_index, stop_index, flat, *aggs_and_cols)
+                         int(start_index), int(stop_index), flat, *aggs_and_cols)
 
     return extend_cpu

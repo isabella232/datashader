@@ -875,10 +875,10 @@ def _build_extend_line_axis1_geom(
 
         for i in range(nrows):
             # Get x index range
-            start_index = start_i[i]
-            stop_index = (start_i[i + 1]
-                          if i < nrows - 1
-                          else flat_len)
+            start_index = int(start_i[i])
+            stop_index = int(start_i[i + 1]
+                             if i < nrows - 1
+                             else flat_len)
 
             for j in range(start_index, stop_index - 2, 2):
 
