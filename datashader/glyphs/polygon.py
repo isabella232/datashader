@@ -1,4 +1,4 @@
-from math import isnan, inf, isfinite
+from math import inf, isfinite, nan
 
 from toolz import memoize
 import numpy as np
@@ -42,10 +42,17 @@ def _build_draw_polygon(append, map_onto_pixel, x_mapper, y_mapper, expand_aggs_
     @expand_aggs_and_cols
     def draw_polygon(
             i, sx, tx, sy, ty, xmin, xmax, ymin, ymax,
-            start_index, stop_index, flat, *aggs_and_cols
+            start_index, stop_index, flat, xs, ys, yincreasing, eligible,
+            *aggs_and_cols
     ):
         """Draw a polygon using a winding-number scan-line algorithm
         """
+        # Initialize values of pre-allocated buffers
+        xs.fill(nan)
+        ys.fill(nan)
+        yincreasing.fill(0)
+        eligible.fill(1)
+
         # First pass, compute bounding box in data coordinates and count number of edges
         num_edges = 0
         poly_xmin = inf
@@ -87,9 +94,6 @@ def _build_draw_polygon(append, map_onto_pixel, x_mapper, y_mapper, expand_aggs_
             return
 
         # Build arrays of edges in canvas coordinates
-        xs = np.zeros((num_edges, 2), dtype=np.int32)
-        ys = np.zeros((num_edges, 2), dtype=np.int32)
-        yincreasing = np.zeros(num_edges, dtype=np.int8)
         ei = 0
         for j in range(start_index, stop_index - 2, 2):
             x0 = flat[j]
@@ -121,9 +125,6 @@ def _build_draw_polygon(append, map_onto_pixel, x_mapper, y_mapper, expand_aggs_
                     continue
 
                 ei += 1
-
-        # Initialize array indicating which edges are still eligible for processing
-        eligible = np.ones(num_edges, dtype=np.int8)
 
         # Perform scan-line algorithm
         for yi in range(startyi, stopyi):
@@ -209,11 +210,21 @@ def _build_extend_polygon_geom(
         nrows = len(start_i)
         flat_len = len(flat)
 
+        # Pre-allocate temp arrays
+        max_edges = max(np.diff(start_i))
+        xs = np.full((max_edges, 2), nan, dtype=np.float32)
+        ys = np.full((max_edges, 2), nan, dtype=np.float32)
+        yincreasing = np.zeros(max_edges, dtype=np.int8)
+
+        # Initialize array indicating which edges are still eligible for processing
+        eligible = np.ones(max_edges, dtype=np.int8)
+
         for i in range(nrows):
             # Get x index range
             start_index = start_i[i]
             stop_index = (start_i[i + 1] if i < nrows - 1 else flat_len)
             draw_polygon(i, sx, tx, sy, ty, xmin, xmax, ymin, ymax,
-                         int(start_index), int(stop_index), flat, *aggs_and_cols)
+                         int(start_index), int(stop_index), flat,
+                         xs, ys, yincreasing, eligible, *aggs_and_cols)
 
     return extend_cpu
