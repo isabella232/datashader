@@ -89,9 +89,10 @@ def _build_draw_polygon(append, map_onto_pixel, expand_aggs_and_cols):
         # Build arrays of edge pixel coordinates
         xs = np.zeros((num_edges, 2), dtype=np.int32)
         ys = np.zeros((num_edges, 2), dtype=np.int32)
-        yincreasing = np.zeros(num_edges, dtype=np.int8)
+        yincreasing = np.zeros((num_edges, 2), dtype=np.int8)
         xdecreasing = np.zeros(num_edges, dtype=np.int8)
         ei = 0
+        poly_starti = 0
         for j in range(start_index, stop_index - 2, 2):
             x0 = flat[j]
             y0 = flat[j + 1]
@@ -110,17 +111,31 @@ def _build_draw_polygon(append, map_onto_pixel, expand_aggs_and_cols):
                 xs[ei, 1] = x1i
                 ys[ei, 1] = y1i
 
-                if y1 > y0:
-                    yincreasing[ei] = 1
-                elif y1 < y0:
-                    yincreasing[ei] = -1
+                # update edge increasing in y-dimension
+                if y1i > y0i:
+                    yincreasing[ei, 0] = 1
+                elif y1i < y0i:
+                    yincreasing[ei, 0] = -1
 
-                if x1 > x0:
+                # update edge decreasing in x-dimension
+                if x1i > x0i:
                     xdecreasing[ei] = -1
-                elif x1 < x0:
+                elif x1i < x0i:
                     xdecreasing[ei] = 1
 
+                # update previous edge increasing in y-dimension
+                if ei < num_edges - 1:
+                    yincreasing[ei + 1, 1] = yincreasing[ei, 0]
+                else:
+                    yincreasing[poly_starti, 1] = yincreasing[ei, 0]
+
                 ei += 1
+            elif isfinite(x0) and isfinite(y0):
+                # update previous edge increasing in y-dimension
+                yincreasing[poly_starti, 1] = yincreasing[ei - 1, 0]
+
+                # starting a new polygon
+                poly_starti = ei
 
         # Initialize array indicating which edges are still eligible for processing
         eligible = np.ones(num_edges, dtype=np.int8)
@@ -144,29 +159,34 @@ def _build_draw_polygon(append, map_onto_pixel, expand_aggs_and_cols):
                     y0i = ys[ei, 0]
                     y1i = ys[ei, 1]
 
-                    # Reject edges that are above, below, or left of current pixel
+                    # Reject edges that are above, below, or left of current pixel.
+                    # and those that are a single pixel
                     if ((y0i > yi and y1i > yi) or
                             (y0i < yi and y1i < yi) or
-                            (x0i < xi and x1i < xi)):
+                            (x0i < xi and x1i < xi) or
+                            ((x1i - x0i) == 1 and (y1i - y0i) == 1)):
                         # Edge not eligible for any remaining pixel in this row
                         eligible[ei] = 0
                         continue
 
-                    # Not correct, need next increasing?
-                    if yincreasing[ei] != xdecreasing[ei] and y1i == yi:
+                    # If the prior edge has the same yincreasing value, then avoid
+                    # double counting the start pixel of current edge. Note that if
+                    # the y-increasing values
+                    if yincreasing[ei, 0] == yincreasing[ei, 1] and y0i == yi:
                         eligible[ei] = 0
                         continue
 
-                    if x0i > xi and x1i > xi:
+                    if x0i >= xi and x1i >= xi:
                         # Edge is fully to the right of the pixel, so we know ray to the
                         # the right of pixel intersects edge.
-                        winding_number += yincreasing[ei]
-                    elif y0i == y1i or x0i == x1i:
-                        # Horizontal or vertical in pixel space. Given prior checks
+                        winding_number += yincreasing[ei, 0]
+                    elif x0i == x1i:
+                        # Vertical in pixel space. Given prior checks
                         # we know that edge intersects with pixel
-                        winding_number += (yincreasing[ei]
-                                           if yincreasing[ei] != 0
-                                           else xdecreasing[ei])
+                        winding_number += yincreasing[ei, 0]
+                    elif y0i == y1i:
+                        # Horizontal in pixel space
+                        winding_number += xdecreasing[ei]
                     else:
                         # Now check if edge is to the right of pixel using cross product
                         # A is vector from pixel to first vertex
@@ -180,9 +200,9 @@ def _build_draw_polygon(append, map_onto_pixel, expand_aggs_and_cols):
                         # Compute cross product of B and A
                         bxa = (bx * ay - by * ax)
 
-                        if bxa * yincreasing[ei] < 0:
+                        if bxa * yincreasing[ei, 0] <= 0:
                             # Edge to the right
-                            winding_number += yincreasing[ei]
+                            winding_number += yincreasing[ei, 0]
                         else:
                             # Edge to left, not eligible for any remaining pixel in row
                             eligible[ei] = 0
