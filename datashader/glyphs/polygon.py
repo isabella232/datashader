@@ -65,8 +65,8 @@ def _build_draw_polygon(append, map_onto_pixel, expand_aggs_and_cols):
                     num_edges += 1
 
         # skip polygon if outside viewport
-        if (poly_xmax < xmin or poly_ymin > xmax
-                or poly_ymax < ymin or poly_xmin > xmax):
+        if (poly_xmax < xmin or poly_xmin > xmax
+                or poly_ymax < ymin or poly_ymin > ymax):
             return
 
         # Compute pixel bounds for polygon
