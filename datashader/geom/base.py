@@ -139,7 +139,7 @@ def _geom_map(start_indices, flat_array, result, fn):
     for i in range(n):
         start = start_indices[i]
         stop = start_indices[i + 1] if i < n - 1 else len(flat_array)
-        result[i] = fn(flat_array, int(start), int(stop))
+        result[i] = fn(flat_array[start:stop])
 
 
 @ngjit

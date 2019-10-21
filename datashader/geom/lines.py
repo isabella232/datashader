@@ -49,7 +49,7 @@ MultiLineString, or LinearRing""".format(typ=type(shape).__name__))
 
     @property
     def length(self):
-        return compute_length(self.array, 0, len(self.array))
+        return compute_length(self.array)
 
     @property
     def area(self):
@@ -85,11 +85,11 @@ class LinesArray(GeomArray):
 
 
 @ngjit
-def compute_length(values, start, stop):
+def compute_length(values):
     total_len = 0.0
-    x0 = values[start]
-    y0 = values[start + 1]
-    for i in range(start + 2, stop, 2):
+    x0 = values[0]
+    y0 = values[1]
+    for i in range(2, len(values), 2):
         x1 = values[i]
         y1 = values[i+1]
 

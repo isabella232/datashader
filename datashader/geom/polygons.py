@@ -90,11 +90,11 @@ shapely.geometry.Polygon or shapely.geometry.MultiPolygon"""
 
     @property
     def length(self):
-        return compute_length(self.array, 0, len(self.array))
+        return compute_length(self.array)
 
     @property
     def area(self):
-        return compute_area(self.array, 0, len(self.array))
+        return compute_area(self.array)
 
 
 @register_extension_dtype
@@ -128,13 +128,13 @@ class PolygonsArray(GeomArray):
 
 
 @ngjit
-def compute_area(values, start, stop):
+def compute_area(values):
     area = 0.0
-    if stop - start < 6:
+    if len(values) < 6:
         # A degenerate polygon
         return 0.0
     polygon_start = 0
-    for k in range(start, stop - 4, 2):
+    for k in range(0, len(values) - 4, 2):
         i, j = k + 2, k + 4
         ix = values[i]
         jy = values[j + 1]
@@ -156,7 +156,7 @@ def compute_area(values, start, stop):
     # wrap-around term for final polygon
     firstx = values[polygon_start]
     secondy = values[polygon_start + 3]
-    lasty = values[stop - 3]
+    lasty = values[len(values) - 3]
     area += firstx * (secondy - lasty)
 
     return area / 2.0
