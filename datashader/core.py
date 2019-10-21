@@ -308,10 +308,6 @@ class Canvas(object):
             agg = any_rdn()
 
         if geometry is not None:
-            if axis != 1:
-                raise ValueError(
-                    'The geometry argument is only supported with axis=1'
-                )
             glyph = LineAxis1Geom(geometry)
         else:
             # Broadcast column specifications to handle cases where
