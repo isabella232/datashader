@@ -992,7 +992,7 @@ def _build_extend_line_axis1_geom(
                     continue
 
                 segment_start = (
-                        (j == 0) or
+                        (j == start_index) or
                         not isfinite(flat[j - 2]) or
                         not isfinite(flat[j - 1])
                 )
