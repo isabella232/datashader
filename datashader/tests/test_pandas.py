@@ -1,5 +1,7 @@
 from __future__ import absolute_import
 from collections import OrderedDict
+from math import nan
+
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -306,6 +308,26 @@ def test_log_axis_points(df):
     out = xr.DataArray(sol, coords=[logcoords, logcoords],
                        dims=['log_y', 'log_x'])
     assert_eq_xr(c_logxy.points(df, 'log_x', 'log_y', ds.count('i32')), out)
+
+
+def test_points_geometry():
+    axis = ds.core.LinearAxis()
+    lincoords = axis.compute_index(axis.compute_scale_and_translate((0., 2.), 3), 3)
+
+    df = pd.DataFrame({
+        'geom': pd.array(
+            [[0, 0], [0, 1, 1, 1], [0, 2, 1, 2, 2, 2]], dtype='Points[float64]'),
+        'v': [1, 2, 3]
+    })
+
+    cvs = ds.Canvas(plot_width=3, plot_height=3)
+    agg = cvs.points(df, geometry='geom', agg=ds.sum('v'))
+    sol = np.array([[1, nan, nan],
+                    [2, 2,   nan],
+                    [3, 3,   3]], dtype='float64')
+    out = xr.DataArray(sol, coords=[lincoords, lincoords],
+                       dims=['y', 'x'])
+    assert_eq_xr(agg, out)
 
 
 def test_line():

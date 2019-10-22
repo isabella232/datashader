@@ -1,4 +1,7 @@
 from __future__ import division, absolute_import
+
+from math import nan
+
 from dask.context import config
 import dask.dataframe as dd
 import numpy as np
@@ -323,6 +326,26 @@ def test_log_axis_points(ddf):
     out = xr.DataArray(sol, coords=[logcoords, logcoords],
                        dims=['log_y', 'log_x'])
     assert_eq_xr(c_logxy.points(ddf, 'log_x', 'log_y', ds.count('i32')), out)
+
+
+def test_points_geometry():
+    axis = ds.core.LinearAxis()
+    lincoords = axis.compute_index(axis.compute_scale_and_translate((0., 2.), 3), 3)
+
+    ddf = dd.from_pandas(pd.DataFrame({
+        'geom': pd.array(
+            [[0, 0], [0, 1, 1, 1], [0, 2, 1, 2, 2, 2]], dtype='Points[float64]'),
+        'v': [1, 2, 3]
+    }), npartitions=3)
+
+    cvs = ds.Canvas(plot_width=3, plot_height=3)
+    agg = cvs.points(ddf, geometry='geom', agg=ds.sum('v'))
+    sol = np.array([[1, nan, nan],
+                    [2, 2,   nan],
+                    [3, 3,   3]], dtype='float64')
+    out = xr.DataArray(sol, coords=[lincoords, lincoords],
+                       dims=['y', 'x'])
+    assert_eq_xr(agg, out)
 
 
 @pytest.mark.parametrize('DataFrame', DataFrames)
