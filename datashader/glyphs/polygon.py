@@ -78,10 +78,12 @@ def _build_draw_polygon(append, map_onto_pixel, x_mapper, y_mapper, expand_aggs_
 
         # Compute pixel bounds for polygon
         startxi, startyi = map_onto_pixel(
-            sx, tx, sy, ty, xmin, xmax, ymin, ymax, poly_xmin, poly_ymin
+            sx, tx, sy, ty, xmin, xmax, ymin, ymax,
+            max(poly_xmin, xmin), max(poly_ymin, ymin)
         )
         stopxi, stopyi = map_onto_pixel(
-            sx, tx, sy, ty, xmin, xmax, ymin, ymax, poly_xmax, poly_ymax
+            sx, tx, sy, ty, xmin, xmax, ymin, ymax,
+            min(poly_xmax, xmax), min(poly_ymax, ymax)
         )
         stopxi += 1
         stopyi += 1
@@ -211,7 +213,14 @@ def _build_extend_polygon_geom(
         flat_len = len(flat)
 
         # Pre-allocate temp arrays
-        max_edges = max(np.diff(start_i))
+        if len(start_i) > 1:
+            max_coordinates = max(np.diff(start_i))
+        else:
+            max_coordinates = 0
+        # Handle case where last polygon is the longest and divide by 2 to get max
+        # number of edges
+        max_edges = int(max(max_coordinates, len(flat) - start_i[-1]) // 2)
+
         xs = np.full((max_edges, 2), nan, dtype=np.float32)
         ys = np.full((max_edges, 2), nan, dtype=np.float32)
         yincreasing = np.zeros(max_edges, dtype=np.int8)

@@ -70,7 +70,7 @@ class GeomArray(RaggedArray):
         super(GeomArray, self).__init__(*args, **kwargs)
         # Validate that there are an even number of elements in each Geom element
         if (any(self.start_indices % 2) or
-                (len(self.flat_array) - self.start_indices[-1]) % 2 > 0):
+                len(self) and (len(self.flat_array) - self.start_indices[-1]) % 2 > 0):
             raise ValueError("There must be an even number of elements in each row")
 
     @property
