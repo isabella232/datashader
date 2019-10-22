@@ -10,6 +10,13 @@ from datashader.geom.base import Geom, GeomDtype, GeomArray, _geom_map
 from datashader.utils import ngjit
 
 
+try:
+    # See if we can register extension type with dask >= 1.1.0
+    from dask.dataframe.extensions import make_array_nonempty
+except ImportError:
+    make_array_nonempty = None
+
+
 @total_ordering
 class Lines(Geom):
     @classmethod
@@ -100,3 +107,11 @@ def compute_length(values):
         y0 = y1
 
     return total_len
+
+
+def lines_array_non_empty(dtype):
+    return LinesArray([[1, 0, 1, 1], [1, 2, 0, 0]], dtype=dtype)
+
+
+if make_array_nonempty:
+    make_array_nonempty.register(LinesDtype)(lines_array_non_empty)

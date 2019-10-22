@@ -9,7 +9,7 @@ import dask.dataframe as dd
 
 
 def dask_DataFrame(*args, **kwargs):
-    return dd.from_pandas(pd.DataFrame(*args, **kwargs), npartitions=2)
+    return dd.from_pandas(pd.DataFrame(*args, **kwargs), npartitions=3)
 
 
 DataFrames = [pd.DataFrame, dask_DataFrame]

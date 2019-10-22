@@ -11,6 +11,13 @@ from datashader.geom.lines import compute_length
 from datashader.utils import ngjit
 
 
+try:
+    # See if we can register extension type with dask >= 1.1.0
+    from dask.dataframe.extensions import make_array_nonempty
+except ImportError:
+    make_array_nonempty = None
+
+
 @total_ordering
 class Polygons(Geom):
     @staticmethod
@@ -160,3 +167,11 @@ def compute_area(values):
     area += firstx * (secondy - lasty)
 
     return area / 2.0
+
+
+def polygons_array_non_empty(dtype):
+    return PolygonsArray([[1, 0, 0, 0, 2, 2], [1, 2, 0, 0, 2, 2]], dtype=dtype)
+
+
+if make_array_nonempty:
+    make_array_nonempty.register(PolygonsDtype)(polygons_array_non_empty)

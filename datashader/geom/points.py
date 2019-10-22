@@ -6,6 +6,13 @@ from pandas.core.dtypes.dtypes import register_extension_dtype
 from datashader.geom.base import Geom, GeomDtype, GeomArray
 
 
+try:
+    # See if we can register extension type with dask >= 1.1.0
+    from dask.dataframe.extensions import make_array_nonempty
+except ImportError:
+    make_array_nonempty = None
+
+
 @total_ordering
 class Points(Geom):
     @classmethod
@@ -59,3 +66,11 @@ class PointsArray(GeomArray):
     @property
     def area(self):
         return np.zeros(self.start_indices.shape, dtype=self.flat_array.dtype)
+
+
+def points_array_non_empty(dtype):
+    return PointsArray([[1, 0, 0, 0], [1, 2, 0, 0]], dtype=dtype)
+
+
+if make_array_nonempty:
+    make_array_nonempty.register(PointsDtype)(points_array_non_empty)
